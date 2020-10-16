@@ -1,0 +1,91 @@
+=================================================================
+./run_video_slam \
+	-v ./orb_vocab/orb_vocab.dbow2 \
+	-m ./test_house_phonecam/neighbor_phonecam.mp4 \
+	-c ./test_house_phonecam/config.yaml \
+	--map-db neighbor_PPT.msg
+
+./run_video_localization \
+	-v ./orb_vocab/orb_vocab.dbow2 \
+	-m ./test_my_house3/Video.avi \
+	-c ./test_my_house3/config.yaml \
+	--frame-skip 3 --no-sleep \
+	--map-db test_my_house1_map.msg
+=========================================================================
+
+./run_image_slam \
+	-v ./orb_vocab/orb_vocab.dbow2 \
+	-i ./test_my_house1/images7/ \
+	-c ./test_my_house1/config.yaml \
+	--frame-skip 5 --no-sleep \
+	--map-db test_my_house1_map.msg
+
+------------------------------------------------------------- 900 -------------------------
+./run_video_slam \
+	-v ./orb_vocab/orb_vocab.dbow2 \
+	-m ./test_EQT_resident/Video_EQT_resident_0p5mpf.mp4 \
+	-c ./test_EQT_yaml/configkp2000.yaml \
+	--map-db resident_EQT_0p5.msg
+
+
+./run_video_slam \
+	-v ./orb_vocab/orb_vocab.dbow2 \
+	-m ./test_simu_equirectangular/Video.mp4 \
+	-c ./test_yaml/configkp10000.yaml \
+	--frame-skip 3 --no-sleep \
+	--map-db test_simu_equirectangular.msg
+*********************************************************** 600*************************8
+RESIDENT
+**************************************************************************************
+./run_video_localization \
+
+./run_video_slam \
+	-v ./orb_vocab/orb_vocab.dbow2 \
+	-m ./test_EQT_resident/Video_EQT_resident_0p5mpf.mp4 \
+	-c ./test_EQT_yaml/configkp2000.yaml \
+	--frame-skip 3 --no-sleep \
+	--map-db test_simu_equirectangular_resident.msg
+
+./run_video_localization \
+	-v ./orb_vocab/orb_vocab.dbow2 \
+	-m ./test_simu_perspective/Video.avi \
+	-c ./test_EQT_yaml/configkp10000.yaml \
+	--frame-skip 3 --no-sleep \
+	--map-db test_simu_equirectangular_resident.msg
+************************************************************* 30*************************
+UNI
+*********************************************************************************************
+./run_video_slam \
+	-v ./orb_vocab/orb_vocab.dbow2 \
+	-m ./test_EQT_uni/uni_EQT_2400.mp4 \
+	-c ./test_EQT_yaml/configkp5000.yaml \
+        --eval-log \
+	--map-db eval_uni_EQT_2400.msg
+
+
+./run_video_slam \
+	-v ./orb_vocab/orb_vocab.dbow2 \
+	-m ./test_EQT_uni/uni_EQT_2400.mp4 \
+	-c ./test_EQT_yaml/configkp5000.yaml \
+	--map-db eval_uni_EQT_2400.msg
+
+************************************************************* 30*************************
+real LIKE surroundings
+*********************************************************************************************
+./run_video_slam \
+	-v ./orb_vocab/orb_vocab.dbow2 \
+	-m ./EQT_LIKE/LIKE_EQT_4820.mp4 \
+	-c ./EQT_LIKE/configkp2000.yaml \
+	--frame-skip 1 --no-sleep \
+	--debug \
+	--map-db LIKE_panorama.msg
+
+##############################################
+// const Mat33_t& rot_cw = cam_pose_cw.block<3, 3>(0, 0);
+            // const Vec3_t& trans_cw = cam_pose_cw.block<3, 1>(0, 3);
+            // const Quat_t quat_cw = Quat_t(rot_cw);
+            // ofs << std::setprecision(15)
+            //     << timestamps.at(frm_id) << " "
+            //     << std::setprecision(9)
+            //     << trans_cw(0) << " " << trans_cw(1) << " " << trans_cw(2) << " "
+            //     << quat_cw.x() << " " << quat_cw.y() << " " << quat_cw.z() << " " << quat_cw.w() << std::endl;
