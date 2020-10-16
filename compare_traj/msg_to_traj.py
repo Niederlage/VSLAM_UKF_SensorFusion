@@ -47,7 +47,7 @@ class Msg_to_Traj:
                 kf_temp = np.hstack(([int(j), src_frame_id], np.array(keyframes[j]['trans_cw'])))
                 kf_temp = np.hstack((kf_temp, np.array(keyframes[j]['rot_cw'])))
                 keyframe_pose_cw = np.vstack((keyframe_pose_cw, kf_temp))
-
+        keyframe_pose_cw = keyframe_pose_cw[keyframe_pose_cw[:, 0].argsort()]
         keyframe_pose_cw = np.delete(keyframe_pose_cw, 0, axis=0)
 
         return np.array(landmark_list), np.array(keyframe_scale), keyframe_pose_cw, keyframe_undists
@@ -191,19 +191,27 @@ class Msg_to_Traj:
 
 
 if __name__ == '__main__':
+
+    SAVE_MSG = True
+    PLOT_POSE = True
+    LOAD_DATA = False
+    PLOT_LANDMARKS = False
+    PLOT_LANDMARKS_3D = False
+    PLOT_ANIMATION = False
+
+    path0 = "/home/taungdrier/Desktop/FAUbox/Archiv_OpenVSLAM/VSLAM_results/eval_uni_EQT_2400_15102020/"
     # path = 'test_simu_equirectangular_resident.msg'
     # path = 'resident_EQT_0p5.msg'
     # path = 'resident_EQT_0p5_skip0_kp2000_noloop.msg'
     # path = 'neighbor_PPT.msg'
     # path = 'uni_EQT_1200_1p05.msg'
-    path = "uni_EQT_2400_skip0_kp2000_noloop_s1p2.msg"
+    # filename = "uni_EQT_2400_skip0_kp2000_noloop_s1p2.msg"
+
+    filename = "eval_uni_EQT_2400_15102020.msg"
     folderpath = 'saved_data/from_msg_data/'
-    SAVE_MSG = False
-    PLOT_POSE = True
-    PLOT_LANDMARKS = False
-    PLOT_LANDMARKS_3D = False
-    PLOT_ANIMATION = False
+    path = path0 + filename
     m2t = Msg_to_Traj(path)
+    saved_name = "saved_" + filename.replace(".msg", "")
 
     if SAVE_MSG:
         landmarks, keyframe_scale, keyframe_pose_cw, keyframe_undists = m2t.msg_unpack_to_array()
@@ -212,7 +220,7 @@ if __name__ == '__main__':
 
         except:
             print('folder already exist ...')
-        np.savez_compressed(folderpath + 'saved_uni_EQT_2400_skip0_kp2000_noloop_s1p2', landmarks=landmarks, keyframe_scale=keyframe_scale,
+        np.savez_compressed(folderpath + saved_name, landmarks=landmarks, keyframe_scale=keyframe_scale,
                             keyframe_pose_cw=keyframe_pose_cw)
         # np.save(folderpath + 'landmarks.npy', landmarks)
         # np.save(folderpath + 'keyframe_scale.npy', keyframe_scale)
@@ -221,19 +229,25 @@ if __name__ == '__main__':
         print('file saved successfully...')
         if PLOT_ANIMATION:
             m2t.plot_animation(keyframe_undists)
+    else:
+        LOAD_DATA = True
 
-    load_data = np.load(folderpath + 'saved_uni_EQT_2400_skip0_kp2000_noloop_s1p2.npz')
-    print('file loaded successfully...')
+    if LOAD_DATA:
+        load_data = np.load(folderpath + 'saved_uni_EQT_2400_skip0_kp2000_noloop_s1p2.npz')
+        print('file loaded successfully...')
+        kf_pose_cw = load_data['keyframe_pose_cw']
+        lm = load_data['landmarks']
+    else:
+        kf_pose_cw = keyframe_pose_cw
+        lm = landmarks
 
     if PLOT_POSE:
-        kf_pose_cw = load_data['keyframe_pose_cw']
-        zw = kf_pose_cw[kf_pose_cw[:, 0].argsort()]  # 按第'1'列排序
-        pose_cw = m2t.get_trajectory(zw[:, 2:])
+        pose_cw = m2t.get_trajectory(kf_pose_cw[:, 2:])
         m2t.plot_pose(pose_cw)
         m2t.plot_baseline(pose_cw)
 
     if PLOT_LANDMARKS:
-        lm = load_data['landmarks']
+
         if PLOT_LANDMARKS_3D:
             m2t.plot_landmarks(lm)
             print("landmark plot successfully...")
