@@ -12,15 +12,19 @@ def cal_scalar_error(br_list, mr_list):
 
 
 def scale_corrector(pose_vslam, pose_gps):
-    window = 10
+    window = 20
     steps = len(pose_gps)
     i = 0
     pose_corrected = np.copy(pose_vslam)
     opt_scale = 1
-    while ((window + i) < steps):
+    while (i < steps):
+        if (window + i) > steps and window > 2:
+            window -= 1
         x_mat = pose_vslam[i:window + i]
         y_mat = pose_gps[i:window + i]
-
+        l_xmat = len(x_mat)
+        if l_xmat < 4:
+            break
         sigmax2 = get_sigma(x_mat)
         sigmay2 = get_sigma(y_mat)
         sigmaxy = np.sqrt(sigmax2 * sigmay2)
@@ -37,7 +41,7 @@ def scale_corrector(pose_vslam, pose_gps):
         # pose_corrected[i] *=opt_scale
         i += 1
 
-    # pose_corrected[-window:] = opt_scale * pose_vslam[-window:]
+    pose_corrected[-window:] = (opt_scale * pose_vslam[-window:] + 0.01 * pose_gps[-window:]) / (opt_scale ** 2 + 0.01)
 
     return pose_corrected
 
@@ -105,16 +109,16 @@ def plot_RMSE(traj_b, traj_noise, traj_m, traj_scaled):
     fig = plt.figure()
 
     # ###################### plot all traj #####################################
-    ax = fig.add_subplot(111)
+    ax = fig.add_subplot(221)
     ax.plot(traj_b[:, 0], traj_b[:, 1], "-", color='g', label='reference trajectory')
-    ax.plot(traj_b[0, 0], traj_b[0, 1],"v", color="g")
+    ax.plot(traj_b[0, 0], traj_b[0, 1], "v", color="g")
     # ax.scatter(traj_b[10, 0], traj_b[10, 1], color="green")
-    ax.plot(traj_b[-1, 0], traj_b[-1, 1],"^", color="g")
+    ax.plot(traj_b[-1, 0], traj_b[-1, 1], "^", color="g")
 
     ax.plot(traj_noise[:, 0], traj_noise[:, 1], ".", color='tab:red', label='groud truth trajectory')
-    ax.plot(traj_noise[0, 0], traj_noise[0, 1], "v",color="tab:red")
+    ax.plot(traj_noise[0, 0], traj_noise[0, 1], "v", color="tab:red")
     # ax.scatter(traj_b[10, 0], traj_b[10, 1], color="green")
-    ax.plot(traj_noise[-1, 0], traj_noise[-1, 1],"^", color="tab:red")
+    ax.plot(traj_noise[-1, 0], traj_noise[-1, 1], "^", color="tab:red")
 
     # draw OpenVSLAM trajectory
     ax.plot(traj_m[:, 0], traj_m[:, 1], "-", color='tab:blue', label='OpenVSLAM trajectory')
@@ -138,27 +142,28 @@ def plot_RMSE(traj_b, traj_noise, traj_m, traj_scaled):
     ax.grid(True)
 
     # # # ###################### plot RMSE #####################################
-    # ax = fig.add_subplot(111)
-    # ax.plot(norm_ref, color='g', label='ground truth-ref error pro frame')
-    # ax.plot(norm_before, color='tab:blue', label='OpenVSLAM-ref error pro frame')
-    # ax.plot(norm_after, color='#663399', label='corrected OpenVSLAM-ref error pro frame')
-    #
-    # # bn_str = 'ground truth-ref RMSE :{:.3f}m'.format(RMSE_ref)
-    # # plt.text(50, 5.6, bn_str, fontsize=14, color='g')  # skip3 14
-    # # bm_str = 'OpenVSLAM-ref RMSE :{:.3f}m'.format(RMSE_before)
-    # # plt.text(50, 5.1, bm_str, fontsize=14, color='tab:blue')  # skip3 14
-    # # bc_str = 'corrected OpenVSLAM RMSE :{:.3f}m'.format(RMSE_after)
-    # # plt.text(50, 4.6, bc_str, fontsize=14, color="#663399")  # skip3 14
-    #
-    # ax.set_xlabel('keyframe', fontsize=12)
-    # ax.set_ylabel('RMSE/m', fontsize=12)
-    # ax.set_title('RMSE compare', fontsize=16)
-    # ax.tick_params(axis='x', rotation=0, labelsize=12)
-    # ax.tick_params(axis='y', rotation=0, labelsize=12)
-    # # ax.set_ylim(0,6)
-    # ax.grid(alpha=.4)
-    # ax.grid(True)
+    ax = fig.add_subplot(212)
+    ax.plot(norm_ref, color='g', label='ground truth-ref error pro frame')
+    ax.plot(norm_before, color='tab:blue', label='OpenVSLAM-ref error pro frame')
+    ax.plot(norm_after, color='#663399', label='corrected OpenVSLAM-ref error pro frame')
+
+    bn_str = 'ground truth-ref RMSE :{:.3f}m'.format(RMSE_ref)
+    plt.text(50, 18, bn_str, fontsize=14, color='g')  # skip3 14
+    bm_str = 'OpenVSLAM-ref RMSE :{:.3f}m'.format(RMSE_before)
+    plt.text(50, 16., bm_str, fontsize=14, color='tab:blue')  # skip3 14
+    bc_str = 'corrected OpenVSLAM RMSE :{:.3f}m'.format(RMSE_after)
+    plt.text(50, 14., bc_str, fontsize=14, color="#663399")  # skip3 14
+
+    ax.set_xlabel('keyframe', fontsize=12)
+    ax.set_ylabel('RMSE/m', fontsize=12)
+    ax.set_title('RMSE compare', fontsize=16)
+    ax.tick_params(axis='x', rotation=0, labelsize=12)
+    ax.tick_params(axis='y', rotation=0, labelsize=12)
+    ax.set_ylim(0,22)
+    ax.grid(alpha=.4)
+    ax.grid(True)
     plt.show()
+
 
 def plot_all(traj_b, traj_m, baseline_b, baseline_m, scalar_list, ave):
     fig = plt.figure()
@@ -312,7 +317,7 @@ def main():
 
     # add noise
     if ADD_NOISE:
-        b_traj_cp_noise = b_traj_cp + 1.5 * np.random.randn(b_traj_cp.shape[0], b_traj_cp.shape[1])  # randn
+        b_traj_cp_noise = b_traj_cp + 5.5 * np.random.randn(b_traj_cp.shape[0], b_traj_cp.shape[1]) + 3.  # randn
         # b_traj_cp[:, 0] += 1.8 * np.random.gamma(2, 1., b_traj_cp.shape[0])  # gamma
         # b_traj_cp[:, 1] += 0.3 * np.random.gamma(1, 1.9, b_traj_cp.shape[0])  # gamma
 
@@ -344,5 +349,5 @@ if __name__ == '__main__':
     LOAD_MSGDATA = True
     PLOT_TRAJ = True
     PLOT_BASELINE = False
-    PLOT_ALL = False
+    PLOT_ALL = True
     main()
