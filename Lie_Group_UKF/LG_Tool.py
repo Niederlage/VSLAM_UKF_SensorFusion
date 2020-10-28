@@ -35,8 +35,8 @@ class Lie_Group:
 
     def chi2state(self, chi):
         Rot = chi[:3, :3]
-        v = chi[:3, 3].reshape((3, 1))
-        x = chi[:3, 4].reshape((3, 1))
+        v = chi[:3, 3]
+        x = chi[:3, 4]
         if np.size(chi, 1) > 5:
             PosAmers = chi[:3, 5:]  # TODO if Landmarks > 1 possible
         else:
@@ -95,9 +95,9 @@ class Lie_Group:
             chi = np.eye(3)
         else:
             a_hat = self.hat_operator(a_)
-            chi = np.eye(3) + np.sin(theta) * a_hat + (1 - np.cos(theta)) * a_hat @ a_hat
+            Rot = np.eye(3) + np.sin(theta) * a_hat + (1 - np.cos(theta)) * a_hat @ a_hat
 
-        return chi
+        return Rot
 
     # with ph clip
     def expSE3(self, xi):
@@ -179,11 +179,11 @@ class Lie_Group:
             norm1 = np.linalg.norm(self.expSO3(phi * a_) - C)
             if norm2 < norm1:
                 phi = -phi
-                print("sign turns")
-            # aaT = a_[:, None] @ a_[:, None].T
-            # aup = self.hat_operator(a_)
-            # iJ = phi / (2 * np.tan(phi / 2)) * np.eye(3) + (1 - phi / (2 * np.tan(phi / 2))) * aaT - phi / 2 * aup
-            iJ = self.vec2jaclInv(phi * a_)
+                # print("sign turns")
+            aaT = a_[:, None] @ a_[:, None].T
+            aup = self.hat_operator(a_)
+            iJ = phi / (2 * np.tan(phi / 2)) * np.eye(3) + (1 - phi / (2 * np.tan(phi / 2))) * aaT - phi / 2 * aup
+            # iJ = self.vec2jaclInv(phi * a_)
             rho = (iJ @ r).T.flatten()
             X = np.hstack((phi * a_, rho))
             return np.real(X)
@@ -337,7 +337,6 @@ class Lie_Group:
         Nxi = len(xi)
         NbAmers = int(Nxi / 3) - 3
         phi = xi[:3]  # TODO if order phi != rho
-        calJl = np.zeros((3, Nxi))
         ph = np.linalg.norm(phi)
         a_ = phi / ph
         ph = self.phi_clip(ph)
@@ -351,15 +350,17 @@ class Lie_Group:
             sph = np.sin(ph) / ph
             Jl = sph * np.eye(3) + (1 - sph) * aaT + cph * aup
 
-        calJl = np.kron(np.eye(NbAmers + 5), Jl)
+        calJl = np.kron(np.eye(NbAmers + 5), Jl) # chi and b: 3*(3+2)=15
 
         for i in range(2):
-            Q = self.vec2Ql(np.hstack((ph * a_, xi[1 + 3 * i - 1:3 + 3 * i])))
+            Q = self.vec2Ql(np.hstack((ph * a_, xi[3 + 3 * i:6 + 3 * i])))
             calJl[:3, 3 * (i + 1):3 * (i + 2)] = Q
 
-        for i in range(NbAmers):
-            Q = self.vec2Ql(np.hstack((ph * a_, xi[9 + 3 * i: 12 + 3 * i])))
-            calJl[: 3, 15 + 3 * i: 18 + 3 * i] = Q
+        if NbAmers > 0:
+            # calJl = np.kron(np.eye(NbAmers + 5), Jl)
+            for i in range(NbAmers):
+                Q = self.vec2Ql(np.hstack((ph * a_, xi[9 + 3 * i: 12 + 3 * i])))
+                calJl[:3, 15 + 3 * i: 18 + 3 * i] = Q
 
         calJl[9: 15, 9: 15] = np.eye(6)
 

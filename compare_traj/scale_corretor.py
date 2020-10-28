@@ -239,7 +239,7 @@ def plot_all(traj_b, traj_m, baseline_b, baseline_m, scalar_list, ave):
 
     ##################### draw corrected distribution ########################################
     ax = fig.add_subplot(235)
-    counts, bins = np.histogram(baseline_m, bins=80)
+    counts, bins = np.histogram(baseline_m, bins=30)
     ax.hist(bins[:-1], bins, weights=counts, facecolor='tab:blue', alpha=0.75)
     ax.set_ylabel("frequency", fontsize=12)
     ax.tick_params(axis='y')
@@ -317,7 +317,7 @@ def main():
 
     # add noise
     if ADD_NOISE:
-        b_traj_cp_noise = b_traj_cp + 5.5 * np.random.randn(b_traj_cp.shape[0], b_traj_cp.shape[1]) + 3.  # randn
+        b_traj_cp_noise = b_traj_cp + 1.5 * np.random.randn(b_traj_cp.shape[0], b_traj_cp.shape[1])   # randn
         # b_traj_cp[:, 0] += 1.8 * np.random.gamma(2, 1., b_traj_cp.shape[0])  # gamma
         # b_traj_cp[:, 1] += 0.3 * np.random.gamma(1, 1.9, b_traj_cp.shape[0])  # gamma
 
