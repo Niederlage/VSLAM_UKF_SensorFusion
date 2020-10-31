@@ -25,6 +25,7 @@ def cholupdate(R, x, sign):
 class Lie_Group:
     def __init__(self):
         self.tolerance = 1e-10
+        self.CLIP_PHI = False
 
     def phi_clip(self, phi):
         phi %= 2 * np.pi
@@ -90,9 +91,12 @@ class Lie_Group:
     def expSO3(self, xi):
         theta = np.linalg.norm(xi)
         a_ = xi / theta
-        theta = self.phi_clip(theta)
+
+        if self.CLIP_PHI:
+            theta = self.phi_clip(theta)
+
         if theta == 0:
-            chi = np.eye(3)
+            Rot = np.eye(3)
         else:
             a_hat = self.hat_operator(a_)
             Rot = np.eye(3) + np.sin(theta) * a_hat + (1 - np.cos(theta)) * a_hat @ a_hat
@@ -106,7 +110,8 @@ class Lie_Group:
         ###########################################
         theta = np.linalg.norm(xi[:3])
         a_ = xi[:3] / theta
-        theta = self.phi_clip(theta)
+        if self.CLIP_PHI:
+            theta = self.phi_clip(theta)
         NbXi = int(np.size(xi) / 3) - 1
         if NbXi < 2:
             if theta == 0:
@@ -150,7 +155,8 @@ class Lie_Group:
     # with ph clip
     def logSO3(self, R):
         theta = np.arccos((np.trace(R) - 1) / 2)
-        theta = self.phi_clip(theta)
+        if self.CLIP_PHI:
+            theta = self.phi_clip(theta)
         if theta == 0:
             res = np.zeros((3,))
         else:
@@ -194,7 +200,8 @@ class Lie_Group:
         if np.size(vec) == 3:
             ph = np.linalg.norm(vec)
             a_ = vec / ph
-            ph = self.phi_clip(ph)
+            if self.CLIP_PHI:
+                ph = self.phi_clip(ph)
             if ph < self.tolerance:
                 # If the angle is small, fall back on the series representation
                 Jl = self.vec2jaclSeries(ph * a_, 10)
@@ -210,7 +217,8 @@ class Lie_Group:
             phi = vec[:3]
             ph = np.linalg.norm(phi)
             a_ = phi / ph
-            ph = self.phi_clip(ph)
+            if self.CLIP_PHI:
+                ph = self.phi_clip(ph)
             if ph < self.tolerance:
                 # If the angle is small, fall back on the series representation
                 Jl = self.vec2jaclSeries(ph * a_, 10)
@@ -246,7 +254,8 @@ class Lie_Group:
         if np.size(vec) == 3:
             ph = np.linalg.norm(vec)
             a_ = vec / ph
-            ph = self.phi_clip(ph)
+            if self.CLIP_PHI:
+                ph = self.phi_clip(ph)
             if ph < self.tolerance:
                 # If the angle is small, fall back on the series representation
                 invJl = self.vec2jaclInvSeries(ph * a_, 10)
@@ -263,7 +272,8 @@ class Lie_Group:
             phi = vec[:3]
             ph = np.linalg.norm(phi)
             a_ = phi / ph
-            ph = self.phi_clip(ph)
+            if self.CLIP_PHI:
+                ph = self.phi_clip(ph)
             if ph < self.tolerance:
                 # If the angle is small, fall back on the series representation
                 invJl = self.vec2jaclInvSeries(ph * a_, 10)
@@ -303,7 +313,8 @@ class Lie_Group:
 
         ph = np.linalg.norm(phi)
         a_ = phi / ph
-        ph = self.phi_clip(ph)
+        if self.CLIP_PHI:
+            ph = self.phi_clip(ph)
 
         ph2 = ph * ph
         ph3 = ph2 * ph
@@ -339,7 +350,8 @@ class Lie_Group:
         phi = xi[:3]  # TODO if order phi != rho
         ph = np.linalg.norm(phi)
         a_ = phi / ph
-        ph = self.phi_clip(ph)
+        if self.CLIP_PHI:
+            ph = self.phi_clip(ph)
         if ph < self.tolerance:
             # If the angle is small, fall back on the series representation
             Jl = self.vec2jaclSeries(phi, 10)
@@ -350,7 +362,7 @@ class Lie_Group:
             sph = np.sin(ph) / ph
             Jl = sph * np.eye(3) + (1 - sph) * aaT + cph * aup
 
-        calJl = np.kron(np.eye(NbAmers + 5), Jl) # chi and b: 3*(3+2)=15
+        calJl = np.kron(np.eye(NbAmers + 5), Jl)  # chi and b: 3*(3+2)=15
 
         for i in range(2):
             Q = self.vec2Ql(np.hstack((ph * a_, xi[3 + 3 * i:6 + 3 * i])))

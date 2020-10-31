@@ -12,7 +12,9 @@ import matplotlib.pyplot as plt
 from scipy.io import loadmat
 from Lie_Group_UKF.UKF_Filter_Right import UKF_LG_Right_Filter
 from Lie_Group_UKF.LG_Tool import Lie_Group
+from Lie_Group_UKF.IEKF_Filter import IEKF_Filter
 import mathutils
+import time
 
 
 def plot_pose(pose_w, pose_real, display3D=False):
@@ -23,7 +25,7 @@ def plot_pose(pose_w, pose_real, display3D=False):
         ax.plot(pose_real[:, 0], pose_real[:, 1], pose_real[:, 2], "-", label='traj real')
         ax.plot(pose_w[:, 0], pose_w[:, 1], pose_w[:, 2], "-", label='traj UKF right')
         ax.scatter(pose_w[0, 0], pose_w[0, 1], pose_w[0, 2], color="red")
-        ax.scatter(pose_w[100, 0], pose_w[100, 1], pose_w[10, 2], color="green")
+        ax.scatter(pose_w[10, 0], pose_w[10, 1], pose_w[10, 2], color="green")
         # ax.scatter(pose_w[-1, 0], pose_w[-1, 1], pose_w[-1, 2], color="purple")
 
         ax.set_zlabel('Z')
@@ -42,12 +44,28 @@ def plot_pose(pose_w, pose_real, display3D=False):
     # ax.set_ylim(-6, 12)
     # ax.set_zlim(-6, 6)
     # fig.colorbar(surf, shrink=0.5, aspect=5)
-    plt.show()
+
+
+def plot_error(error):
+    fig = plt.figure()
+    ax = fig.gca()
+    ax.plot(error[:, 0], error[:, 1], "-", color="purple", label='theta error')
+    ax.plot(error[:, 0], error[:, 2], "r-", label='postion error')
+
+    ax.legend()
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    # ax.set_xlim(-5, 12)
+    # ax.set_ylim(-6, 12)
+    # ax.set_zlim(-6, 6)
+    # fig.colorbar(surf, shrink=0.5, aspect=5)
 
 
 if __name__ == '__main__':
+    print("start ukf estimation...")
+    start = time.time()
     lg = Lie_Group()
-
+    RUN_UKF = True
     # load test data
     # trajR = loadmat("data/trajR.mat")['trajR']
     # rot_trajR = trajR[0][0][0]
@@ -56,10 +74,11 @@ if __name__ == '__main__':
     # omega_b_trajR = trajR[0][0][6]
     # a_b_trajR = trajR[0][0][7]
 
-    trajReal = loadmat("data/trajReal2244.mat")['trajReal']
+    trajReal = loadmat("data/trajReal.mat")['trajReal']
     a_b_trajReal = loadmat("data/trajReal_a_b.mat")['trajReal'][0][0][0]
     omega_b_trajReal = loadmat("data/trajReal_omega_b.mat")['trajReal'][0][0][0]
-    quat_trajReal = loadmat("data/trajReal_quat.mat")['trajReal'][0][0][0]
+    # quat_trajReal = loadmat("data/trajReal_quat.mat")['trajReal'][0][0][0]
+    quat_trajReal = loadmat('data/trajReal_quat.mat')['trajReal'][0][0][2][:, 881:]
     x_trajReal = trajReal[0][0][3]
     v_trajReal = trajReal[0][0][4]
 
@@ -67,7 +86,7 @@ if __name__ == '__main__':
     # tmin = 1081-1
     omega_input = loadmat("data/omega.mat")["omega"]
     acc_input = loadmat("data/acc.mat")["acc"]
-    y_measure = x_trajReal[:, ::10]
+    y_measure = x_trajReal
     errorR = loadmat("data/errorR.mat")['errorR']
     errorR_errorR = errorR[0][0][0]
     errorX_errorR = errorR[0][0][1]
@@ -88,8 +107,15 @@ if __name__ == '__main__':
     bias0 = np.hstack((omega_b0, acc_b0))
 
     # run UKF filter
+    # if RUN_UKF:
     ukf_right = UKF_LG_Right_Filter(xi0, bias0, tIMU)
-    test_traj = ukf_right.run_ukf(omega_input, acc_input, y_measure)
+    test_traj, test_error = ukf_right.run_ukf(omega_input, acc_input, y_measure, quat_trajReal)
 
-    # plot_pose(x_trajR.T, x_trajReal.T, display3D=True)
+    # else:
+    #     iekf = IEKF_Filter(xi0, bias0, tIMU)
+    #     test_traj = iekf.run_iekf(omega_input, acc_input, y_measure)
+    print("ukf elapsed time:", time.time() - start)
+    plot_pose(test_traj[:, 7:10], x_trajReal.T, display3D=True)
+    plot_error(test_error)
+    plt.show()
 print(1)

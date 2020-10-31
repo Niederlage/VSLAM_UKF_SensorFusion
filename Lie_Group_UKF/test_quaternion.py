@@ -1,8 +1,9 @@
 from mathutils import Quaternion
 import numpy as np
 from enum import Enum
-from Lie_Group_UKF.LG_Tool import cholupdate
+from Lie_Group_UKF.LG_Tool import cholupdate, Lie_Group
 from scipy.linalg import pascal
+from scipy.spatial.transform import Rotation
 
 
 class Color(Enum):
@@ -51,6 +52,20 @@ R = np.linalg.cholesky(A)
 # print(R_aug[4:8])
 # print(R_aug[4:])
 A = pascal(5)
-X = np.linalg.qr(A,mode='r')
+X = np.linalg.qr(A, mode='r')
+lg = Lie_Group()
+a = np.arange(1, 4)[:, None] * 8
+M = a @ a.T
+q, r = np.linalg.qr(M)
+theta = lg.logSO3(q)
+# print(q)
+# print(r)
+# print("det:",np.linalg.det(r))
+# print(np.linalg.norm(q))
+ac = np.zeros((3, 5))
+ac[:3, :3] = np.eye(3)
+bc = np.array([0, 0, 0, 0, 1])[:, None]
 
-print(1)
+test_theta = Rotation.from_quat(np.array([1, 0, 0, 0]))
+test_theta = test_theta.as_euler('zyx', degrees=True)
+print(408%20)
