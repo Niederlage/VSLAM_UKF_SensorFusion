@@ -109,7 +109,8 @@ class Lie_Group:
         #     given phi must remain in (-pi,pi)
         ###########################################
         theta = np.linalg.norm(xi[:3])
-        a_ = xi[:3] / theta
+        if theta != 0:
+            a_ = xi[:3] / theta
         if self.CLIP_PHI:
             theta = self.phi_clip(theta)
         NbXi = int(np.size(xi) / 3) - 1

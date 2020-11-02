@@ -12,7 +12,9 @@ import matplotlib.pyplot as plt
 from scipy.io import loadmat
 from Lie_Group_UKF.UKF_Filter_Right import UKF_LG_Right_Filter
 from Lie_Group_UKF.LG_Tool import Lie_Group
-from Lie_Group_UKF.IEKF_Filter import IEKF_Filter
+from Lie_Group_UKF.RIEKF_Filter import RIEKF_Filter
+from Lie_Group_UKF.LIEKF_Filter import LIEKF_Filter
+from Lie_Group_UKF.RIEKF_RUKF_Hybrid_Filter import Hybrid_KF_Right_Filter
 import mathutils
 import time
 
@@ -46,15 +48,63 @@ def plot_pose(pose_w, pose_real, display3D=False):
     # fig.colorbar(surf, shrink=0.5, aspect=5)
 
 
-def plot_error(error):
+def plot_error(error, biaslist, compare_all_error=False):
     fig = plt.figure()
-    ax = fig.gca()
-    ax.plot(error[:, 0], error[:, 1], "-", color="purple", label='theta error')
-    ax.plot(error[:, 0], error[:, 2], "r-", label='postion error')
+    # ax = fig.gca()
 
-    ax.legend()
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
+    if compare_all_error:
+        plt.style.use('seaborn')
+        ax = fig.add_subplot(221)
+        ax.plot(biaslist[:, 0], "-", color="tab:red", label='velocity error x')
+        ax.plot(biaslist[:, 1], "-", color="tab:green", label='velocity error y')
+        ax.plot(biaslist[:, 2], "-", color="tab:blue", label='velocity error z')
+        ax.legend()
+        ax.set_xlabel('predict times', fontsize=16)
+        ax.set_ylabel('Amplitude[m/s]', fontsize=16)
+
+        ax = fig.add_subplot(223)
+        ax.plot(biaslist[:, 3], "-", color="tab:red", label='position error x')
+        ax.plot(biaslist[:, 4], "-", color="tab:green", label='position error y')
+        ax.plot(biaslist[:, 5], "-", color="tab:blue", label='position error z')
+        ax.legend()
+        ax.set_xlabel('predict times', fontsize=16)
+        ax.set_ylabel('Amplitude[m]', fontsize=16)
+
+        ax = fig.add_subplot(222)
+        ax.plot(error[:, 0], "-", color="tab:red", label='rotation error x')
+        ax.plot(error[:, 1], "-", color="tab:green", label='rotation error y')
+        ax.plot(error[:, 2], "-", color="tab:blue", label='rotation error z')
+        ax.legend()
+        ax.set_xlabel('predict times', fontsize=16)
+        ax.set_ylabel('Amplitude[°]', fontsize=16)
+
+        ax = fig.add_subplot(224)
+        ax.plot(biaslist[:, 6], "-", color="tab:red", label='rotation bias x')
+        ax.plot(biaslist[:, 7], "-", color="tab:green", label='rotation bias y')
+        ax.plot(biaslist[:, 8], "-", color="tab:blue", label='rotation bias z')
+        ax.plot(biaslist[:, 9], "-", color="red", label='position bias x')
+        ax.plot(biaslist[:, 10], "-", color="green", label='position bias y')
+        ax.plot(biaslist[:, 11], "-", color="blue", label='position bias z')
+        ax.legend()
+        ax.set_xlabel('predict times', fontsize=16)
+        ax.set_ylabel('Amplitude', fontsize=16)
+
+    else:
+        ax = fig.add_subplot(211)
+        ax.plot(error[:, 0], error[:, 1], "-", color="purple", label='theta error')
+        ax.plot(error[:, 0], error[:, 2], "r-", label='postion error')
+
+        ax = fig.add_subplot(212)
+        ax.plot(biaslist[:, 0], marker="+", label='theta bias x')
+        ax.plot(biaslist[:, 1], "+", label='theta bias y')
+        ax.plot(biaslist[:, 2], "+", label='theta bias z')
+        ax.plot(biaslist[:, 3], "-", label='position bias x')
+        ax.plot(biaslist[:, 4], "-", label='position bias y')
+        ax.plot(biaslist[:, 5], "-", label='position bias z')
+        ax.legend()
+        ax.set_xlabel('predict times', fontsize=20)
+        ax.set_ylabel('Amplitude', fontsize=20)
+
     # ax.set_xlim(-5, 12)
     # ax.set_ylim(-6, 12)
     # ax.set_zlim(-6, 6)
@@ -62,10 +112,12 @@ def plot_error(error):
 
 
 if __name__ == '__main__':
-    print("start ukf estimation...")
+    print("start estimation...")
     start = time.time()
     lg = Lie_Group()
-    RUN_UKF = True
+    RUN_UKF = False
+    RUN_IEKF = False
+    COMPARE_ALL_ERROR = True
     # load test data
     # trajR = loadmat("data/trajR.mat")['trajR']
     # rot_trajR = trajR[0][0][0]
@@ -107,15 +159,37 @@ if __name__ == '__main__':
     bias0 = np.hstack((omega_b0, acc_b0))
 
     # run UKF filter
-    # if RUN_UKF:
-    ukf_right = UKF_LG_Right_Filter(xi0, bias0, tIMU)
-    test_traj, test_error = ukf_right.run_ukf(omega_input, acc_input, y_measure, quat_trajReal)
+    if RUN_UKF:
+        ukf_right = UKF_LG_Right_Filter(xi0, bias0, tIMU, 1400, COMPARE_ALL_ERROR)
+        test_traj, test_error = ukf_right.run_ukf(omega_input, acc_input, y_measure, quat_trajReal)
+        print("UKF elapsed time:", time.time() - start)
 
-    # else:
-    #     iekf = IEKF_Filter(xi0, bias0, tIMU)
-    #     test_traj = iekf.run_iekf(omega_input, acc_input, y_measure)
-    print("ukf elapsed time:", time.time() - start)
+    # run IEKF filter
+    elif RUN_IEKF:
+        iekf = RIEKF_Filter(xi0, bias0, tIMU, 3000, COMPARE_ALL_ERROR)
+        test_traj, test_error = iekf.run_iekf(omega_input, acc_input, y_measure, quat_trajReal)
+
+        # iekf = LIEKF_Filter(xi0, bias0, tIMU, 1000, COMPARE_ALL_ERROR)
+        # test_traj, test_error = iekf.run_iekf(omega_input, acc_input, y_measure, quat_trajReal)
+
+        print("IEKF elapsed time:", time.time() - start)
+
+    # run hybrid filter
+    else:
+        hybrid_kf = Hybrid_KF_Right_Filter(xi0, bias0, tIMU, 4000, COMPARE_ALL_ERROR)
+        test_traj, test_error = hybrid_kf.run_hybrid_ukf(omega_input, acc_input, y_measure, quat_trajReal)
+        print("hybrid KF elapsed time:", time.time() - start)
+
     plot_pose(test_traj[:, 7:10], x_trajReal.T, display3D=True)
-    plot_error(test_error)
+
+    if COMPARE_ALL_ERROR:
+        l_traj = len(test_traj)
+        error_traj = np.zeros((l_traj, 12))
+        error_traj[:, :3] = test_traj[:, 4:7] - v_trajReal[:, :l_traj].T
+        error_traj[:, 3:6] = test_traj[:, 7:10] - x_trajReal[:, :l_traj].T
+        error_traj[:, 6:] = test_traj[:, 10:] - bias0
+        plot_error(test_error, error_traj, compare_all_error=True)
+    else:
+        plot_error(test_error, test_traj[:, 10:])
     plt.show()
 print(1)

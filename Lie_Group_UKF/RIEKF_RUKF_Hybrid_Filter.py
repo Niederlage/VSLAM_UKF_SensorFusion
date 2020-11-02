@@ -6,7 +6,7 @@ import mathutils
 from scipy.spatial.transform import Rotation
 
 
-class UKF_LG_Right_Filter():
+class Hybrid_KF_Right_Filter():
 
     def __init__(self, xi0, bias0, timestamp, iter_steps, ERROR_CHECK):
         self.g = np.array([0, 0, -9.80665])
@@ -49,58 +49,61 @@ class UKF_LG_Right_Filter():
         self.obsTime = np.zeros((len(timestamp),))
         self.obsTime[::5] = 1
 
-    def rukfPropagation(self, chi_post, chi_j, bias_j, S_j, u_j, Q_j, dt_j):
-        # Left-UKF on Lie Groups
-        l_S = len(S_j)  # state size
-        Qc = np.linalg.cholesky(Q_j).T
-        S_aug = block_diag(S_j, Qc)
-        l_aug = len(S_aug)
+    def iekfPropagation(self, chi_i, bias_i, P_i, u_i, Q_i, dt_i):
+        # IEKF on Lie Groups
+        # N_lm = chi_i[:, 5:].shape[1]
+        N_P = len(P_i)
+        N_Q = len(Q_i)
 
-        # scaled unsented transform           <<<<<<<<TODO CHANGE scaled unsented transform
-        W0 = 1 - l_aug / 3
-        Wj = (1 - W0) / (2 * l_aug)
-        gamma = np.sqrt(l_aug / (1 - W0))
-        v_0 = chi_j[:3, 3]
-        x_0 = chi_j[:3, 4]
-        R_0 = chi_j[:3, :3]
+        # state propagation
+        omega_i = u_i[:3]
+        acc_i = u_i[3:]
+        omega_b = bias_i[:3]
+        acc_b = bias_i[3:]
 
-        # Prediction
-        ichi = self.lg.invSE3(chi_post)
-        u_j -= bias_j  # unbiased inputs
-        X = gamma * np.hstack((np.zeros((l_aug, 1)), S_aug, -S_aug))  # sigma-points
-        d_bias = X[l_S + 6:l_S + 12, :] * dt_j
-        X[9:15, :] = X[9:15, :] + d_bias  # add bias noise
+        Rot_i = chi_i[:3, :3] @ self.lg.expSO3((omega_i - omega_b) * dt_i)
+        delta_a_i = Rot_i @ (acc_i - acc_b)
+        v_i = chi_i[:3, 3] + (delta_a_i + self.g) * dt_i
+        x_i = chi_i[:3, 4] + v_i * dt_i
 
-        for j in range(1, 2 * l_aug + 1):
-            # xi_j = np.hstack((X[:9, j], X[15:l_S, j]))  # do not take bias
+        # covariance propagation
+        F_i = np.eye(N_P)
+        F_i[:3, 9:12] = - Rot_i * dt_i
 
-            # select sample incremental state
-            xi_j = X[:9, j]  # do not take bias
-            w_j = X[l_S:l_aug, j]
-            omega_bj = X[9:12, j]
-            a_bj = X[12:15, j]
+        F_i[3:6, :3] = self.lg.hat_operator(self.g) * dt_i
+        F_i[3:6, 9:12] = -self.lg.hat_operator(v_i) @ Rot_i * dt_i
+        F_i[3:6, 12:15] = -Rot_i * dt_i
 
-            # nonlinear- Lie Group propagation
-            chi_j = self.lg.expSE3(xi_j) @ chi_j
-            Rot_j = R_0 @ self.lg.expSO3((u_j[:3] - omega_bj + w_j[:3]) * dt_j)
-            theta_j = Rotation.from_matrix(Rot_j)
-            theta_ = theta_j.as_euler('zyx', degrees=True)
-            da_imu = u_j[3:] - a_bj + w_j[3:6]
-            da_j = Rot_j @ da_imu
-            dv_inertial = (da_j + self.g) * dt_j
-            v_j = v_0 + dv_inertial
-            x_j = x_0 + v_j * dt_j
-            chi = self.lg.state2chi(Rot_j, v_j, x_j, chi_j[:3, 5:])
-            Xi_j = chi @ ichi  # can be more time efficient
-            logXi_j = self.lg.logSE3(Xi_j)
-            X[:9, j] = logXi_j[:9]  # propagated sigma points
-            # X[16 - 1:l_S, j - 1] = logXi_j[16 - 1:l_S, j - 1]
+        F_i[6:9, :3] = self.lg.hat_operator(self.g) * dt_i * dt_i
+        F_i[6:9, 3:6] = np.eye(3) * dt_i
+        F_i[6:9, 9:12] = -self.lg.hat_operator(x_i) @ Rot_i * dt_i
+        F_i[6:9, 12:15] = -Rot_i * dt_i * dt_i
 
-        X = np.sqrt(Wj) * X
-        Rs = np.squeeze(scipy.linalg.qr(X[:l_S, 1:2 * l_aug + 1].T, mode='r'))
-        S_propagate = Rs[:l_S, :l_S]
-        # normS_propagate = np.linalg.norm(S_propagate)
-        return S_propagate
+        # if N_lm > 0:
+        #     for i in range(N_lm):
+        #         p_i = chi_i[:3, i + 9]
+        #         F_i[15 + 3 * i:18 + 3 * i, 9:12] = -self.lg.hat_operator(p_i) @ Rot_i * dt_i
+
+        G_i = np.zeros((N_P, N_Q))
+        G_i[:3, :3] = Rot_i
+        G_i[:3, 6:9] = Rot_i * dt_i
+
+        G_i[3:6, :3] = self.lg.hat_operator(v_i) * Rot_i
+        G_i[3:6, 3:6] = Rot_i
+        G_i[3:6, 6:9] = self.lg.hat_operator(v_i) * Rot_i * dt_i * dt_i
+        G_i[3:6, 9:12] = Rot_i * dt_i * dt_i
+
+        G_i[6:9, :3] = self.lg.hat_operator(x_i) * Rot_i
+        G_i[6:9, 3:6] = Rot_i * dt_i
+        G_i[6:9, 6:9] = self.lg.hat_operator(x_i) * Rot_i * dt_i * dt_i * dt_i
+        G_i[6:9, 9:12] = Rot_i * dt_i * dt_i * dt_i
+
+        G_i[9:15, 6:12] = np.eye(6)
+
+        P_predict = F_i @ P_i @ F_i.T + G_i @ (Q_i * dt_i) @ G_i.T * dt_i
+        chi_predict = self.lg.state2chi(Rot_i, v_i, x_i, None)
+
+        return chi_predict, P_predict
 
     def rukfObservation(self, chi, n_n):
         # >>> chi, xi, param, n_n
@@ -205,13 +208,14 @@ class UKF_LG_Right_Filter():
         traj = np.vstack((traj, state_rows))
         return traj
 
-    def run_ukf(self, omega, acc, y_mess, test_quat):
+    def run_hybrid_ukf(self, omega, acc, y_mess, test_quat):
         # init all
         t_i = 0
         trajR = self.trajectory
         # Nmax = omega.shape[1]
         # l_mess = y_mess.shape[1] // 10
         S_R = np.copy(self.S0)
+        P_R = self.P0
         Qc = np.copy(self.Qc)
         bias_i = np.copy(self.bias0)
         RotR = self.lg.expSO3(self.xi0[:3])
@@ -228,16 +232,9 @@ class UKF_LG_Right_Filter():
             dt = self.timestamp[step_i] - self.timestamp[step_i - 1]
             chiR_last = np.copy(chiR)
 
-            # motion dynamic
-            dRotR = self.lg.expSO3((omega_i - bias_i[:3]) * dt)
-            RotR = RotR @ dRotR
-            dvR = (RotR @ (acc_i - bias_i[3:]) + self.g) * dt
-            vR = vR + dvR
-            xR = xR + vR * dt
-            chiR_predict = self.lg.state2chi(RotR, vR, xR, None)
-
             u_i = np.hstack((omega_i, acc_i))
-            S_R = self.rukfPropagation(chiR_last, chiR_predict, bias_i, S_R, u_i, Qc, dt)
+            chiR_predict, P_R = self.iekfPropagation(chiR_last, bias_i, P_R, u_i, Qc, dt)
+            S_R = np.linalg.cholesky(P_R).T
 
             # calculate propagation error
             test_rot = mathutils.Quaternion(test_quat[:, step_i])
@@ -258,21 +255,12 @@ class UKF_LG_Right_Filter():
             # measurement and update
             if self.obsTime[step_i] == 1:
                 chiR, bias_i, S_R = self.rukfUpdate(chiR_predict, bias_i, S_R, y_mess[:, step_i], self.W)
-                RotR, vR, xR, __ = self.lg.chi2state(chiR)
+                # RotR, vR, xR, __ = self.lg.chi2state(chiR)
                 trajR = self.updateTraj(trajR, chiR, bias_i)
                 t_i += 1
             else:
                 trajR = self.updateTraj(trajR, chiR_predict, bias_i)
                 chiR = chiR_predict
-
-            # if (t_i % 20 == 0):
-            #     print(y_mess[:, step_i] - chiR_predict[:3, 4])
-            #     print(t_i)
-            # if theta_error > 10:
-            #     print("theta error exceed!")
-            # print("theta error:",test_theta)
-            # print(y_mess[:, step_i] - chiR_predict[:3, 4])
-            # print(t_i)
 
         return trajR, errorlist
 
