@@ -48,7 +48,7 @@ class RIEKF_Filter():
         # init observetime
         self.timestamp = timestamp
         self.obsTime = np.zeros((len(timestamp),))
-        self.obsTime[::20] = 1
+        self.obsTime[::10] = 1
 
     def iekfPropagation(self, chi_i, bias_i, P_i, u_i, Q_i, dt_i):
         # IEKF on Lie Groups

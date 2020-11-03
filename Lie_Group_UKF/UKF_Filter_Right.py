@@ -47,7 +47,7 @@ class UKF_LG_Right_Filter():
         # init observetime
         self.timestamp = timestamp
         self.obsTime = np.zeros((len(timestamp),))
-        self.obsTime[::5] = 1
+        self.obsTime[::10] = 1
 
     def rukfPropagation(self, chi_post, chi_j, bias_j, S_j, u_j, Q_j, dt_j):
         # Left-UKF on Lie Groups

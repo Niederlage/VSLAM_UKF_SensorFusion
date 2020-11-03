@@ -47,7 +47,7 @@ class Hybrid_KF_Right_Filter():
         # init observetime
         self.timestamp = timestamp
         self.obsTime = np.zeros((len(timestamp),))
-        self.obsTime[::5] = 1
+        self.obsTime[::10] = 1
 
     def iekfPropagation(self, chi_i, bias_i, P_i, u_i, Q_i, dt_i):
         # IEKF on Lie Groups
@@ -194,9 +194,9 @@ class Hybrid_KF_Right_Filter():
 
         # Update mean state
         chi_next = self.lg.expSE3(xibar) @ chi_i
-        JT = self.lg.vec2adjJl(xibar)
+        # JT = self.lg.vec2adjJl(xibar)
         # JTnorm = np.linalg.norm(JT)
-        S_i = S_i @ JT
+        # S_i = S_i @ JT
 
         return chi_next, bias_update, S_i
 

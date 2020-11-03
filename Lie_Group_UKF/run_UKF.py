@@ -25,7 +25,13 @@ def plot_pose(pose_w, pose_real, display3D=False):
     if display3D:
         ax = fig.gca(projection='3d')
         ax.plot(pose_real[:, 0], pose_real[:, 1], pose_real[:, 2], "-", label='traj real')
-        ax.plot(pose_w[:, 0], pose_w[:, 1], pose_w[:, 2], "-", label='traj UKF right')
+        if RUN_UKF:
+            ax.plot(pose_w[:, 0], pose_w[:, 1], pose_w[:, 2], "-", label='traj UKF right')
+        elif RUN_IEKF:
+            ax.plot(pose_w[:, 0], pose_w[:, 1], pose_w[:, 2], "-", label='traj RIEKF')
+        else:
+            ax.plot(pose_w[:, 0], pose_w[:, 1], pose_w[:, 2], "-", label='traj RIEKF-UKF-hybrid KF')
+
         ax.scatter(pose_w[0, 0], pose_w[0, 1], pose_w[0, 2], color="red")
         ax.scatter(pose_w[10, 0], pose_w[10, 1], pose_w[10, 2], color="green")
         # ax.scatter(pose_w[-1, 0], pose_w[-1, 1], pose_w[-1, 2], color="purple")
@@ -138,7 +144,7 @@ if __name__ == '__main__':
     # tmin = 1081-1
     omega_input = loadmat("data/omega.mat")["omega"]
     acc_input = loadmat("data/acc.mat")["acc"]
-    y_measure = x_trajReal
+    y_measure = x_trajReal * 20
     errorR = loadmat("data/errorR.mat")['errorR']
     errorR_errorR = errorR[0][0][0]
     errorX_errorR = errorR[0][0][1]
@@ -160,13 +166,13 @@ if __name__ == '__main__':
 
     # run UKF filter
     if RUN_UKF:
-        ukf_right = UKF_LG_Right_Filter(xi0, bias0, tIMU, 1400, COMPARE_ALL_ERROR)
+        ukf_right = UKF_LG_Right_Filter(xi0, bias0, tIMU, 1000, COMPARE_ALL_ERROR)
         test_traj, test_error = ukf_right.run_ukf(omega_input, acc_input, y_measure, quat_trajReal)
         print("UKF elapsed time:", time.time() - start)
 
     # run IEKF filter
     elif RUN_IEKF:
-        iekf = RIEKF_Filter(xi0, bias0, tIMU, 3000, COMPARE_ALL_ERROR)
+        iekf = RIEKF_Filter(xi0, bias0, tIMU, 4000, COMPARE_ALL_ERROR)
         test_traj, test_error = iekf.run_iekf(omega_input, acc_input, y_measure, quat_trajReal)
 
         # iekf = LIEKF_Filter(xi0, bias0, tIMU, 1000, COMPARE_ALL_ERROR)
@@ -180,7 +186,7 @@ if __name__ == '__main__':
         test_traj, test_error = hybrid_kf.run_hybrid_ukf(omega_input, acc_input, y_measure, quat_trajReal)
         print("hybrid KF elapsed time:", time.time() - start)
 
-    plot_pose(test_traj[:, 7:10], x_trajReal.T, display3D=True)
+    plot_pose(test_traj[:, 7:10],   y_measure.T, display3D=True)
 
     if COMPARE_ALL_ERROR:
         l_traj = len(test_traj)

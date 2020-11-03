@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.special import bernoulli
+from scipy.linalg import block_diag
 from scipy.spatial.transform import Rotation as Rotm
 
 
@@ -77,15 +78,18 @@ class Lie_Group:
         return xi
 
     def curlyhat_operator(self, theta):
-        vec_len = np.size(theta)
+        vec_len = np.size(theta) // 3
         phi = theta[:3]
-        rho = theta[3:]
-        xi = np.zeros((vec_len // 3 + 2, vec_len // 3 + 2))
-        rot = self.hat_operator(phi)
-        xi[:3, :3] = rot
-        xi[:3, 3:] = self.hat_operator(rho)
-        xi[3:, 3:] = rot
-        return xi
+        phi_x = self.hat_operator(phi)
+        if vec_len > 2:
+            xi_x = np.kron(np.eye(vec_len), phi_x)
+            for i in range(1, vec_len):
+                xi_x[:3, 3 * i:3 * i + 3] = self.hat_operator(theta[3 * i:3 * i + 3])
+        else:
+            rho_x = self.hat_operator(theta[3:])
+            xi_x = np.kron(np.eye(2), phi_x)
+            xi_x[:3, 3:] = rho_x
+        return xi_x
 
     # with ph clip
     def expSO3(self, xi):
@@ -167,8 +171,12 @@ class Lie_Group:
 
     def logSE3(self, chi):
         C = chi[:3, :3]
+        # normalize C to ensure its orthogonality
+        CC_T = np.linalg.inv(C @ C.T)
+        R = np.linalg.cholesky(CC_T).T @ C
+
         r = chi[:3, 3:]
-        eigs, vecs = np.linalg.eig(C)
+        eigs, vecs = np.linalg.eig(R)
         idx = np.argmin(abs(eigs - 1))  # the index von lambda_min -1
         a_ = vecs[:, idx]  # 3x1 vector
         phi = np.arccos(0.5 * (np.trace(C) - 1))
@@ -425,14 +433,19 @@ class Lie_Group:
 #         self.rms.omega_b = omega_b
 #         self.rms.a_b = a_b
 if __name__ == '__main__':
-    test_expso3 = True
-    test_expse3 = False
+    test_expso3 = False
+    test_expse3 = True
     test_jacobi = False
     lg = Lie_Group()
     alpha = np.array([-np.sqrt(0.4) * np.pi / 5, np.sqrt(0.1) * np.pi / 5, np.sqrt(0.5) * np.pi / 5])
     beta = np.array([0.5 * np.pi, 0, 0])
-    xp = np.array([-np.sqrt(0.4) * np.pi / 5, np.sqrt(0.1) * np.pi / 5, np.sqrt(0.5) * np.pi / 5, -11.2, 46, 10])
+    xp = np.array(
+        [-np.sqrt(0.1) * np.pi * 1.5, -np.sqrt(0.1) * np.pi * 1.5, np.sqrt(0.8) * np.pi * 1.5, -11.2, 46, 10, 3, 2,
+         10])
 
+    xp_x = lg.curlyhat_operator(xp)
+
+    print(1)
     if test_expso3:
         C1 = lg.expSO3(alpha)
         C2 = lg.expSO3(beta)
